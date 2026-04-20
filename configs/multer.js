@@ -1,7 +1,7 @@
 import multer from 'multer';
 
-const stroage=multer.diskStorage({});
+const storage = multer.memoryStorage();
 
-const upload=multer({stroage})
+const upload = multer({ storage })
 
 export default upload;

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const ResumeSchema = new mongoose.Schema({
-    userid: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     title: { type: String, default: 'Untitled Resume' },
     public: { type: Boolean, default: false },
     template: { type: String, default: "classic" },
@@ -51,6 +51,7 @@ const ResumeSchema = new mongoose.Schema({
 
 }, { timestamps: true, minimize: false })
 
+ResumeSchema.index({ userId: 1, updatedAt: -1 })
 
 const Resume=mongoose.model('Resume',ResumeSchema)
 

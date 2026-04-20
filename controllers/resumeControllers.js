@@ -1,6 +1,5 @@
 import imagekit from "../configs/imagekit.js";
 import Resume from "../models/Resume.js";
-import fs from 'fs'
 
 //controller for creating  a new resume
 //POST: /api/resume/create
@@ -85,6 +84,11 @@ export const updateResume = async (req, res) => {
     try {
         const userId = req.userId;
         const { resumeId, resumeData, removeBackground } = req.body;
+        const existingResume = await Resume.findOne({ userId, _id: resumeId })
+
+        if (!existingResume) {
+            return res.status(404).json({ message: 'Resume not found' })
+        }
 
         // if (!resumeId || !resumeData) {
         //     return res.status(400).json({ message: 'Missing resume update payload' })
@@ -101,18 +105,40 @@ export const updateResume = async (req, res) => {
         // }
 
         const image = req.file;
-        let resumeDataCopy = JSON.parse(resumeData);
-        if (image) {
-            const imageBufferData = fs.createReadStream(image.path)
-            const response = await imagekit.files.upload({
-                file: imageBufferData,
-                fileName: 'resume.jpg',
-                folder: 'user-resume',
-                transformation: {
-                    pre: 'w-300,h-300,fo-face,z-0.75' + (removeBackground ? ',e-bgremove' : '')
+        let warning = '';
+        let resumeDataCopy;
+        if (typeof resumeData === 'string') {
+            resumeDataCopy = await JSON.parse(resumeData)
+        } else {
+            resumeDataCopy = structuredClone(resumeData)
+        }
+
+        resumeDataCopy.personal_info = resumeDataCopy.personal_info ? { ...resumeDataCopy.personal_info } : {}
+
+        if (!('image' in resumeDataCopy.personal_info)) {
+            resumeDataCopy.personal_info.image = existingResume.personal_info?.image || ''
+        }
+
+        if (image?.buffer) {
+            try {
+                const uploadOptions = {
+                    file: image.buffer,
+                    fileName: image.originalname || 'resume.jpg',
+                    folder: 'user-resume',
                 }
-            });
-            resumeDataCopy.personal_info.image = response.url
+
+                if (removeBackground) {
+                    uploadOptions.transformation = {
+                        pre: 'e-bgremove'
+                    }
+                }
+
+                const response = await imagekit.files.upload(uploadOptions);
+                resumeDataCopy.personal_info.image = response.url
+            } catch (uploadError) {
+                resumeDataCopy.personal_info.image = existingResume.personal_info?.image || ''
+                warning = 'Resume details were saved, but image upload failed.'
+            }
         }
 
 
@@ -126,7 +152,7 @@ export const updateResume = async (req, res) => {
         //     return res.status(404).json({ message: 'Resume not found' })
         // }
 
-        return res.status(200).json({ message: 'Saved successfully', resume })
+        return res.status(200).json({ message: 'Saved successfully', warning, resume })
     } catch (error) {
         return res.status(400).json({ message: error.message })
     }
